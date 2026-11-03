@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lotes Abertos</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+.busca{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 16px;border-radius:14px;box-shadow:var(--shadow);margin-top:20px}
+.busca svg{flex:none;color:var(--muted)}
+.busca input{flex:1;min-width:0;border:0;background:none;font-size:17px;padding:10px 0;outline:none}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 6px}
+.filtros select,.filtros input{border-radius:99px;padding:7px 14px;font-size:14px}
+.filtros input[type=number]{width:150px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:7px 14px;font-size:14px;cursor:pointer;user-select:none;transition:.15s}
+.pill input{display:none}
+.pill:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+
+.aviso-site{display:flex;gap:12px;align-items:flex-start;background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:12px;padding:12px 14px;margin-top:16px;font-size:13px;line-height:1.5}
+.aviso-site b{color:var(--fg)}
+.aviso-site .ic{font-size:18px;line-height:1.2}
+
+/* Layout: lotes à esquerda, mapa fixo à direita */
+.wrap.pagina{max-width:1440px}
+.pagina{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"hero" "lat" "res"}
+.pagina>.hero{grid-area:hero}.pagina>.lateral{grid-area:lat}.pagina>.resultados{grid-area:res}
+@media (min-width:1100px){
+  .pagina{grid-template-columns:minmax(0,1fr) 380px;grid-template-areas:"hero lat" "res lat";column-gap:24px}
+  .lateral{position:sticky;top:76px;align-self:start;max-height:calc(100vh - 92px);overflow-y:auto;margin-top:36px;scrollbar-width:thin}
+  .lateral .icms{margin:0}
+  .lateral .icms>summary{cursor:default;pointer-events:none}
+  .lateral .icms>summary .seta,.lateral .icms>summary .sub{display:none}
+  .lateral .icms-corpo{grid-template-columns:1fr;gap:12px}
+  .lateral svg#mapa{max-height:min(46vh,420px)}
+  .nav .wrap{max-width:1440px}
+  .lateral .icms>summary{padding:12px 16px 4px}
+  .lateral .icms-corpo{padding:0 14px 14px}
+  .lateral .painel .obs{display:none}
+  .lateral .calc{margin-top:10px;padding-top:10px}
+  .lateral #btnFiltro{margin-top:10px!important}
+  .lateral .pct{font-size:40px;margin:8px 0 4px}
+  .lateral .painel{padding:14px 16px}
+}
+
+/* Mapa do ICMS */
+.icms{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);margin:18px 0 6px}
+.icms>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;font-weight:600}
+.icms>summary::-webkit-details-marker{display:none}
+.icms>summary .sub{font-weight:400;font-size:13px;color:var(--muted)}
+.icms>summary .seta{margin-left:auto;color:var(--muted);transition:transform .2s}
+.icms[open]>summary .seta{transform:rotate(180deg)}
+.icms-corpo{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;padding:0 18px 18px;align-items:start}
+@media (max-width:820px){.icms-corpo{grid-template-columns:1fr}}
+svg#mapa{width:100%;height:auto;display:block;max-height:460px;overflow:visible}
+#mapa path{fill:var(--c);stroke:var(--mapa-borda);stroke-width:1.2;stroke-linejoin:round;cursor:pointer;
+  transform-box:fill-box;transform-origin:center;transition:opacity .18s,transform .18s,filter .18s,fill .18s}
+#mapa path:focus{outline:none}
+#mapa.tem-ativo path{opacity:.28}
+#mapa.tem-ativo path.ativo{opacity:1;fill:var(--accent);transform:scale(1.06) translateY(-2px);filter:drop-shadow(0 6px 10px rgba(30,20,90,.35));stroke-width:2}
+#mapa path.filtro{stroke:var(--accent);stroke-width:3}
+#mapa text{font-size:13px;font-weight:600;fill:var(--fg);pointer-events:none;text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--card);stroke-width:3px;transition:opacity .18s}
+#mapa.tem-ativo text{opacity:.25}
+#mapa.tem-ativo text.ativo{opacity:1;fill:#fff;stroke:none;font-size:15px}
+.legenda{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:12px;color:var(--muted);margin-top:8px}
+.legenda .barra{flex:1;max-width:220px;height:8px;border-radius:99px;background:linear-gradient(90deg,var(--esc0),var(--esc1))}
+.painel{background:var(--bg-2);border-radius:12px;padding:18px}
+.painel h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.painel .reg{color:var(--muted);font-size:13px}
+.pct{font-size:48px;font-weight:700;letter-spacing:-.04em;line-height:1;margin:12px 0 6px;background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.selo{display:inline-block;font-size:12px;padding:3px 9px;border-radius:99px;font-weight:500}
+.selo.ok{background:var(--ok-soft);color:var(--ok)}.selo.est{background:var(--warn-soft);color:var(--warn)}
+.calc{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.calc label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+.calc .campo{width:100%}
+.linhas{display:grid;grid-template-columns:1fr auto;gap:5px;margin:10px 0 0;font-size:14px;font-variant-numeric:tabular-nums}
+.linhas dt{color:var(--muted)}.linhas dd{margin:0;text-align:right}
+.linhas .tot{font-weight:700;color:var(--fg)}
+.obs{font-size:12px;color:var(--muted);margin-top:8px}
+.vazio-painel{color:var(--muted);font-size:14px}
+.tip{position:fixed;z-index:40;pointer-events:none;background:var(--fg);color:var(--bg);border-radius:10px;padding:8px 12px;font-size:14px;box-shadow:var(--shadow-hi);opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s;white-space:nowrap}
+.tip.on{opacity:1;transform:none}
+.tip b{font-size:18px;margin-left:6px}
+.tip small{display:block;opacity:.75;font-size:12px}
+
+/* Resultados */
+.barra-res{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0;color:var(--muted);font-size:14px}
+.barra-res b{color:var(--fg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+@media (max-width:380px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;box-shadow:var(--shadow);overflow:hidden;transition:transform .18s,box-shadow .18s,border-color .18s}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hi);border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.foto{position:relative;aspect-ratio:4/3;background:var(--bg-2);border:0;padding:0;margin:0;cursor:zoom-in;display:block;width:100%;overflow:hidden}
+.foto img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}
+.card:hover .foto img{transform:scale(1.04)}
+.foto .qtd{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;font-weight:600;padding:3px 8px;border-radius:99px;backdrop-filter:blur(4px)}
+.foto.sem{cursor:default;display:grid;place-items:center;color:var(--muted);font-size:13px;aspect-ratio:auto;height:70px}
+.corpo{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--bg-2);color:var(--muted);font-weight:500}
+.chip.pf{background:var(--ok-soft);color:var(--ok)}
+.chip.desc{background:var(--accent-soft);color:var(--accent)}
+.titulo{font-size:15px;font-weight:600;line-height:1.35;margin:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.mais-itens{font-size:13px;color:var(--muted)}
+.mais-itens summary{cursor:pointer}
+.mais-itens ul{margin:6px 0 0;padding-left:18px}
+.local{display:flex;gap:6px;font-size:13px;color:var(--muted)}
+.preco{margin-top:auto;padding-top:12px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.preco .total{font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.preco .rot{font-size:12px;color:var(--muted)}
+.preco .det{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;line-height:1.6}
+.aviso{color:var(--warn)}
+.acoes{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+.vazio{grid-column:1/-1;padding:60px 20px;text-align:center;color:var(--muted)}
+#mais{display:flex;margin:24px auto 0}
+.sk{height:380px;border-radius:var(--r);background:linear-gradient(90deg,var(--card) 25%,var(--bg-2) 50%,var(--card) 75%);background-size:200% 100%;animation:sk 1.2s infinite;border:1px solid var(--line)}
+@keyframes sk{to{background-position:-200% 0}}
+
+/* Modal de detalhes do lote */
+.titulo.abre{cursor:pointer}.titulo.abre:hover{color:var(--accent)}
+.ver-itens{align-self:flex-start;background:none;border:0;padding:0;color:var(--accent);font-size:13px;font-weight:500;cursor:pointer}
+.ver-itens:hover{text-decoration:underline}
+dialog.detalhe{border:1px solid var(--line);border-radius:18px;padding:0;background:var(--card);color:var(--fg);width:min(960px,calc(100vw - 24px));max-height:calc(100vh - 24px);box-shadow:var(--shadow-hi)}
+dialog.detalhe::backdrop{background:rgba(5,6,10,.6);backdrop-filter:blur(4px)}
+dialog.detalhe[open]{display:flex;flex-direction:column;animation:sobe .2s ease-out}
+@keyframes sobe{from{opacity:0;transform:translateY(12px) scale(.98)}}
+.dt-topo{display:flex;align-items:flex-start;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.dt-topo h2{margin:0;font-size:19px;letter-spacing:-.01em;line-height:1.3;overflow-wrap:anywhere}
+.dt-topo .meta{justify-content:flex-start;gap:10px;margin-top:4px;flex-wrap:wrap}
+.dt-fechar{margin-left:auto;flex:none;width:38px;height:38px;border-radius:99px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:16px}
+.dt-fechar:hover{border-color:var(--accent);color:var(--accent)}
+.dt-corpo{overflow-y:auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+@media (max-width:760px){.dt-corpo{grid-template-columns:minmax(0,1fr);padding:14px}}
+.dt-fotos{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px;scrollbar-width:thin}
+.dt-fotos button{flex:none;width:120px;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:1px solid var(--line);padding:0;cursor:zoom-in;background:var(--bg-2)}
+.dt-fotos img{width:100%;height:100%;object-fit:cover;display:block}
+.dt-itens-topo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.dt-itens-topo h3{margin:0;font-size:15px;margin-right:auto}
+.dt-itens-topo .campo{padding:6px 10px;font-size:13px;border-radius:99px;flex:0 1 200px;min-width:0}
+@media (max-width:560px){.dt-itens-topo h3{width:100%}.dt-itens-topo .campo{flex:1 1 100%}}
+.seg{display:inline-flex;background:var(--bg-2);border-radius:99px;padding:3px}
+.seg button{border:0;background:none;border-radius:99px;padding:4px 12px;font-size:13px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+table.itens{width:100%;border-collapse:collapse;font-size:13px}
+table.itens th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:-18px;background:var(--card)}
+table.itens td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+table.itens td.q{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600;width:1%}
+table.itens tr:hover td{background:var(--bg-2)}
+table.itens details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:3px}
+table.itens details div{font-size:12px;color:var(--muted);margin-top:4px;font-family:ui-monospace,Consolas,monospace;line-height:1.6;max-height:260px;overflow-y:auto}
+.dt-nada{color:var(--muted);font-size:13px;padding:14px 8px}
+.dt-lado{display:flex;flex-direction:column;gap:12px}
+.bloco{background:var(--bg-2);border-radius:12px;padding:14px}
+.bloco h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.bloco dl{display:grid;grid-template-columns:auto 1fr;gap:5px 10px;margin:0;font-size:13px}
+.bloco dt{color:var(--muted)}.bloco dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.bloco .grande{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.dt-lado .btn{width:100%}
+
+/* Galeria */
+dialog.galeria{border:0;padding:0;background:transparent;max-width:100vw;max-height:100vh;width:100vw;height:100vh;margin:0}
+dialog.galeria::backdrop{background:rgba(5,6,10,.88);backdrop-filter:blur(6px)}
+.gal{position:relative;width:100%;height:100%;display:grid;place-items:center;padding:56px 16px 70px}
+.gal img{display:block;width:auto;height:auto;max-width:min(900px,calc(100vw - 120px));max-height:calc(100vh - 140px);object-fit:contain;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+@media (max-width:600px){.gal img{max-width:calc(100vw - 32px)}}
+.gal button{position:absolute;background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:99px;width:44px;height:44px;font-size:22px;cursor:pointer;display:grid;place-items:center}
+.gal button:hover{background:rgba(255,255,255,.24)}
+.gal .fechar{top:12px;right:12px}.gal .ant{left:12px;top:50%}.gal .prox{right:12px;top:50%}
+.gal .info{position:absolute;bottom:18px;left:16px;right:16px;text-align:center;color:#e8eaf0;font-size:13px}
+@media (prefers-reduced-motion:reduce){.card,.sk,.foto img,#mapa path{transition:none;animation:none}}
+</style>
+</head>
+<body>
+<nav class="nav"><div class="wrap">
+  <a class="logo" href="index.html"><i>⚖</i><span>Leilões RFB</span></a>
+</div></nav>
+
+<main class="wrap pagina">
+  <section class="hero">
+    <h1>Encontre lotes nos <em>leilões da Receita</em></h1>
+    <p id="gerado">Carregando lotes…</p>
+    <div class="aviso-site" role="note">
+      <span class="ic" aria-hidden="true">ℹ️</span>
+      <div><b>Este site não vende nada e não coleta nenhum dado seu.</b> É apenas um indexador independente de lotes
+        de leilões (passados, presentes e futuros) da Receita Federal, sem vínculo com o órgão. Não há cadastro, login,
+        cookies nem rastreamento. <b>Preços, impostos e informações podem estar errados ou desatualizados</b> — confira
+        sempre o edital e o site oficial antes de dar qualquer lance.</div>
+    </div>
+    <label class="busca campo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Buscar: rtx, notebook, iphone…" aria-label="Buscar lotes" autofocus>
+    </label>
+    <div class="filtros">
+      <select id="uf" class="campo" aria-label="Estado"><option value="">Todos os estados</option></select>
+      <select id="tipo" class="campo" aria-label="Tipo"><option value="">Todos os tipos</option></select>
+      <input id="max" class="campo" type="number" min="0" step="100" placeholder="Lance até R$" aria-label="Lance mínimo até">
+      <label class="pill"><input id="pf" type="checkbox" checked>Aceita pessoa física</label>
+      <label class="pill"><input id="comFoto" type="checkbox">Com foto</label>
+      <select id="ord" class="campo" aria-label="Ordenar">
+        <option value="fim">Encerra antes</option>
+        <option value="menor">Menor preço</option>
+        <option value="maior">Maior preço</option>
+        <option value="desconto">Maior desconto</option>
+      </select>
+    </div>
+  </section>
+
+  <aside class="lateral">
+  <details class="icms" id="icms" open>
+    <summary>🗺️ ICMS por estado <span class="sub">— passe o mouse para ver a alíquota, clique para filtrar os lotes</span><span class="seta">▾</span></summary>
+    <div class="icms-corpo">
+      <div>
+        <svg id="mapa" role="group" aria-label="Mapa do Brasil por estado com alíquota de ICMS"></svg>
+        <div class="legenda"><span id="lmin">—</span><div class="barra"></div><span id="lmax">—</span><span>· * estimativa a conferir</span></div>
+      </div>
+      <aside class="painel" id="painel" aria-live="polite"></aside>
+    </div>
+  </details>
+  </aside>
+
+  <div class="resultados">
+  <div class="barra-res"><span id="resumo"></span><button id="limpar" class="btn fantasma" hidden>Limpar filtros</button></div>
+  <div class="grid" id="grid"></div>
+  <button id="mais" class="btn" hidden>Mostrar mais</button>
+
+  <footer class="rodape">
+    <b>Aviso:</b> este site não vende produtos, não intermedeia lances e não coleta, armazena nem compartilha dados
+    dos visitantes (os filtros ficam salvos apenas no seu próprio navegador). É um indexador independente de lotes de
+    leilões da Receita Federal, sem vínculo com o órgão, montado a partir de dados públicos do Sistema de Leilão
+    Eletrônico. As fotos são carregadas diretamente dos servidores do governo. Valores, alíquotas e demais
+    informações podem conter erros ou estar desatualizados e não têm valor oficial.
+    O lance é feito somente no site oficial (e-CAC). ICMS estimado pela alíquota interna da UF onde o lote está;
+    alguns produtos têm alíquota própria — confira sempre o edital. Taxas de armazenagem não estão incluídas. Malha do mapa: IBGE.
+  </footer>
+  </div>
+</main>
+
+<div class="tip" id="tip"></div>
+<dialog class="detalhe" id="detalhe" aria-labelledby="dtTitulo"></dialog>
+<dialog class="galeria" id="galeria">
+  <div class="gal">
+    <img id="galImg" alt="">
+    <button class="fechar" aria-label="Fechar">✕</button>
+    <button class="ant" aria-label="Foto anterior">‹</button>
+    <button class="prox" aria-label="Próxima foto">›</button>
+    <div class="info" id="galInfo"></div>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const brl = v => v == null ? "—" : v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const pctFmt = v => v.toLocaleString("pt-BR",{maximumFractionDigits:2}) + "%";
+const norm = s => (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtData = s => s ? s.slice(8,10)+"/"+s.slice(5,7)+" "+s.slice(11,16) : "";
+const POR_PAGINA = 60;
+const PADRAO = {q:"",uf:"",tipo:"",pf:true,comFoto:false,max:"",o:"fim"};
+let lotes = [], editais = {}, icms = {}, geo = null, lotesPorUF = {}, filtrados = [], mostrando = 0;
+$("#grid").innerHTML = "<div class='sk'></div>".repeat(6);
+
+/* ---------- Lotes ---------- */
+function destacar(txt, termos){
+  let h = esc(txt);
+  for (const t of termos) if (t.length > 1)
+    h = h.replace(new RegExp("("+t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi"),"<mark>$1</mark>");
+  return h;
+}
+
+function card(l, idx, termos){
+  const e = editais[l.edle] || {};
+  const a = icms[l.uf];
+  const imposto = a ? l.valorMinimo * a.pct / 100 : null;
+  const itens = l.itens.length ? l.itens : [{d:l.tipo, q:null}];
+  const desc = l.valorAvaliacao ? Math.round((1 - l.valorMinimo / l.valorAvaliacao) * 100) : 0;
+  const item = i => `${i.q&&i.q!=1?`<b>${i.q} ${esc(i.un)}</b> · `:""}${destacar(i.d,termos)}`;
+  const foto = l.fotos.length
+    ? `<button class="foto" data-idx="${idx}" aria-label="Ver ${l.fotos.length} foto(s) do lote ${l.lote}">
+         <img src="${esc(l.fotos[0].min)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+         ${l.fotos.length>1?`<span class="qtd">📷 ${l.fotos.length}</span>`:""}</button>`
+    : `<div class="foto sem">Sem foto</div>`;
+  return `<article class="card">${foto}<div class="corpo">
+    <div class="meta"><span>${esc(e.cidade||"")} · Lote ${l.lote}</span><span>até ${fmtData(e.fimPropostas)}</span></div>
+    <div class="chips">
+      <span class="chip">${esc(l.tipo)}</span>
+      ${l.permitePF?'<span class="chip pf">Pessoa física</span>':'<span class="chip">Só empresas</span>'}
+      ${desc>=10?`<span class="chip desc">−${desc}% da avaliação</span>`:""}
+    </div>
+    <p class="titulo abre" data-det="${idx}" title="Ver detalhes do lote">${item(itens[0])}</p>
+    ${itens.length>1?`<button class="ver-itens" data-det="${idx}">Ver todos os ${itens.length.toLocaleString("pt-BR")} itens →</button>`:""}
+    <div class="local"><span aria-hidden="true">📍</span><span>${esc(l.recinto || e.cidade || "Local no edital")}${l.uf?` · <b>${l.uf}</b>`:""}</span></div>
+    <div class="preco">
+      <div><div class="rot">Custo estimado</div><div class="total">${brl(l.valorMinimo + (imposto||0))}</div></div>
+      <div class="det">Lance mín. ${brl(l.valorMinimo)}<br>
+        ${a?`<span class="${a.conferido?"":"aviso"}">+ ICMS ${pctFmt(a.pct)}${a.conferido?"":" *"}</span>`:"+ ICMS (ver edital)"}</div>
+    </div>
+    <div class="acoes">
+      <button class="btn" data-det="${idx}">Detalhes</button>
+      <a class="btn primario" href="${l.url}" target="_blank" rel="noopener">Site oficial ↗</a>
+    </div>
+  </div></article>`;
+}
+
+const ler = () => ({q:$("#q").value, uf:$("#uf").value, tipo:$("#tipo").value, pf:$("#pf").checked, comFoto:$("#comFoto").checked, max:$("#max").value, o:$("#ord").value});
+function escrever(f){ $("#q").value=f.q||""; $("#uf").value=f.uf||""; $("#tipo").value=f.tipo||""; $("#pf").checked=f.pf!==false; $("#comFoto").checked=!!f.comFoto; $("#max").value=f.max||""; $("#ord").value=f.o||"fim"; }
+
+function aplicar(){
+  const f = ler();
+  const termos = norm(f.q).split(/\s+/).filter(Boolean);
+  const max = parseFloat(f.max);
+  filtrados = lotes.filter(l =>
+    (!f.uf || l.uf === f.uf) && (!f.tipo || l.tipo === f.tipo) && (!f.pf || l.permitePF) &&
+    (!f.comFoto || l.fotos.length) && (isNaN(max) || l.valorMinimo <= max) &&
+    termos.every(t => l._busca.includes(t)));
+  const fim = l => (editais[l.edle]||{}).fimPropostas || "";
+  const descv = l => l.valorAvaliacao ? 1 - l.valorMinimo / l.valorAvaliacao : 0;
+  filtrados.sort({
+    fim:(a,b)=>fim(a).localeCompare(fim(b))||a.lote-b.lote,
+    menor:(a,b)=>a.valorMinimo-b.valorMinimo,
+    maior:(a,b)=>b.valorMinimo-a.valorMinimo,
+    desconto:(a,b)=>descv(b)-descv(a),
+  }[f.o]);
+  mostrando = 0; $("#grid").innerHTML = ""; renderMais(termos);
+  $("#resumo").innerHTML = `<b>${filtrados.length.toLocaleString("pt-BR")}</b> lotes encontrados${f.uf?` em <b>${f.uf}</b>`:""}`;
+  $("#limpar").hidden = JSON.stringify(f) === JSON.stringify(PADRAO);
+  try { localStorage.setItem("filtros", JSON.stringify(f)); } catch {}
+  const u = new URL(location); f.uf ? u.searchParams.set("uf", f.uf) : u.searchParams.delete("uf"); history.replaceState(null, "", u);
+  mapaFiltro(f.uf);
+}
+
+function renderMais(termos){
+  termos ??= norm($("#q").value).split(/\s+/).filter(Boolean);
+  const fatia = filtrados.slice(mostrando, mostrando + POR_PAGINA);
+  $("#grid").insertAdjacentHTML("beforeend", fatia.map((l,i)=>card(l, mostrando+i, termos)).join(""));
+  mostrando += fatia.length;
+  $("#mais").hidden = mostrando >= filtrados.length;
+  if (!filtrados.length) $("#grid").innerHTML = '<div class="vazio">Nenhum lote com esses filtros.</div>';
+}
+
+/* ---------- Modal de detalhes ---------- */
+// Agrupa itens iguais ignorando números de série/IMEI (sequências longas de dígitos)
+const chaveItem = d => norm(d).replace(/\b[a-z0-9]*\d{6,}[a-z0-9]*\b/g, "").replace(/[\s,;:/-]+/g, " ").trim();
+let det = {l:null, agrupar:true, busca:""};
+
+function agruparItens(itens){
+  const m = new Map();
+  for (const i of itens){
+    const k = chaveItem(i.d) || norm(i.d);
+    if (!m.has(k)) m.set(k, {d:i.d, un:i.un, q:0, linhas:[]});
+    const g = m.get(k);
+    g.q += +i.q || 1; g.linhas.push(i.d);
+  }
+  return [...m.values()].sort((a,b) => b.q - a.q);
+}
+
+function linhasItens(){
+  const {l, agrupar, busca} = det, termos = norm(busca).split(/\s+/).filter(Boolean);
+  const casa = d => termos.every(t => norm(d).includes(t));
+  const fmtQ = (q, un) => `${(+q||1).toLocaleString("pt-BR")} ${esc(un||"un")}`;
+  let html, n;
+  if (agrupar){
+    const gs = agruparItens(l.itens).filter(g => g.linhas.some(casa));
+    n = gs.length;
+    html = gs.map(g => `<tr><td class="q">${fmtQ(g.q, g.un)}</td><td>${destacar(g.linhas.length>1 ? (chaveItem(g.d).toUpperCase() || g.d) : g.d, termos)}
+      ${g.linhas.length>1?`<details><summary>${g.linhas.length.toLocaleString("pt-BR")} descrições (séries/IMEIs)</summary><div>${g.linhas.map(x=>destacar(x,termos)).join("<br>")}</div></details>`:""}</td></tr>`).join("");
+  } else {
+    const is = l.itens.filter(i => casa(i.d));
+    n = is.length;
+    html = is.map(i => `<tr><td class="q">${fmtQ(i.q, i.un)}</td><td>${destacar(i.d, termos)}</td></tr>`).join("");
+  }
+  $("#dtTabela").innerHTML = n ? html : `<tr><td colspan="2" class="dt-nada">Nenhum item com “${esc(busca)}”.</td></tr>`;
+}
+
+function abrirDetalhe(l){
+  const e = editais[l.edle] || {}, a = icms[l.uf];
+  const imposto = a ? l.valorMinimo * a.pct / 100 : null;
+  const desc = l.valorAvaliacao ? Math.round((1 - l.valorMinimo / l.valorAvaliacao) * 100) : 0;
+  const totalUn = l.itens.reduce((s,i) => s + (+i.q || 1), 0);
+  const gs = agruparItens(l.itens), grupos = gs.length;
+  det = {l, agrupar: grupos < l.itens.length, busca: ""};
+  const maior = gs[0];   // título = tipo de item mais numeroso do lote
+  const titulo = !maior ? l.tipo : maior.linhas.length > 1 ? (chaveItem(maior.d).toUpperCase() || maior.d) : maior.d;
+  $("#detalhe").innerHTML = `
+    <div class="dt-topo">
+      <div><h2 id="dtTitulo">${esc(titulo)}${grupos>1?` <span style="color:var(--muted);font-weight:500">e mais ${grupos-1} ${grupos>2?"tipos":"tipo"}</span>`:""}</h2>
+        <div class="meta"><span>Lote ${l.lote}</span><span>Edital ${esc(e.edital||l.edle)}</span><span>${esc(e.cidade||"")}</span></div>
+        <div class="chips" style="margin-top:8px"><span class="chip">${esc(l.tipo)}</span>
+          ${l.permitePF?'<span class="chip pf">Aceita pessoa física</span>':'<span class="chip">Só empresas</span>'}
+          ${desc>=10?`<span class="chip desc">−${desc}% da avaliação</span>`:""}</div></div>
+      <button class="dt-fechar" aria-label="Fechar">✕</button>
+    </div>
+    <div class="dt-corpo">
+      <div>
+        ${l.fotos.length?`<div class="dt-fotos">${l.fotos.map((f,i)=>`<button data-foto="${i}" aria-label="Abrir foto ${i+1}"><img src="${esc(f.min)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join("")}</div>`:""}
+        <div class="dt-itens-topo">
+          <h3>${l.itens.length.toLocaleString("pt-BR")} ${l.itens.length===1?"item":"itens"} · ${totalUn.toLocaleString("pt-BR")} unidades</h3>
+          ${l.itens.length>5?`<input class="campo" id="dtBusca" type="search" placeholder="Buscar no lote…" aria-label="Buscar itens do lote">`:""}
+          ${grupos<l.itens.length?`<div class="seg" role="group" aria-label="Modo de exibição">
+            <button data-modo="1" aria-pressed="true">Agrupado (${grupos.toLocaleString("pt-BR")})</button>
+            <button data-modo="0" aria-pressed="false">Lista completa</button></div>`:""}
+        </div>
+        <table class="itens"><thead><tr><th>Qtd.</th><th>Descrição</th></tr></thead><tbody id="dtTabela"></tbody></table>
+      </div>
+      <aside class="dt-lado">
+        <div class="bloco"><h4>Valores</h4><dl>
+          <dt>Lance mínimo</dt><dd>${brl(l.valorMinimo)}</dd>
+          ${l.valorAvaliacao?`<dt>Avaliação</dt><dd>${brl(l.valorAvaliacao)}</dd>`:""}
+          <dt>ICMS ${a?pctFmt(a.pct):""}${a&&!a.conferido?" *":""}</dt><dd>${imposto!=null?brl(imposto):"ver edital"}</dd>
+          <dt>Custo estimado</dt><dd class="grande">${brl(l.valorMinimo+(imposto||0))}</dd>
+        </dl>${a&&!a.conferido?`<div class="obs aviso">* alíquota de ${l.uf} ainda não conferida</div>`:""}</div>
+        <div class="bloco"><h4>Retirada</h4><dl>
+          <dt>Local</dt><dd>${esc(l.recinto || "ver edital")}</dd>
+          <dt>Estado</dt><dd>${esc(l.uf || "—")}</dd>
+        </dl></div>
+        <div class="bloco"><h4>Datas</h4><dl>
+          <dt>Propostas</dt><dd>${fmtData(e.inicioPropostas)} a ${fmtData(e.fimPropostas)}</dd>
+          <dt>Lances</dt><dd>${fmtData(e.aberturaLances)}</dd>
+        </dl>${e.contato?`<div class="obs">${esc(e.contato)}</div>`:""}</div>
+        <a class="btn primario" href="${l.url}" target="_blank" rel="noopener">Ver no site oficial ↗</a>
+        <a class="btn" href="${e.pdf}" target="_blank" rel="noopener">Edital completo (PDF)</a>
+        <div class="obs">Valores estimados, podem estar errados. Confira sempre o edital.</div>
+      </aside>
+    </div>`;
+  linhasItens();
+  const dlg = $("#detalhe");
+  dlg.querySelector(".dt-fechar").onclick = () => dlg.close();
+  dlg.querySelectorAll("[data-modo]").forEach(b => b.onclick = () => {
+    det.agrupar = b.dataset.modo === "1";
+    dlg.querySelectorAll("[data-modo]").forEach(x => x.setAttribute("aria-pressed", x === b));
+    linhasItens();
+  });
+  let tb; dlg.querySelector("#dtBusca")?.addEventListener("input", ev => { clearTimeout(tb); tb = setTimeout(() => { det.busca = ev.target.value; linhasItens(); }, 120); });
+  dlg.querySelectorAll("[data-foto]").forEach(b => b.onclick = () => { gal = {l, i:+b.dataset.foto}; galMostrar(); $("#galeria").showModal(); });
+  dlg.showModal();
+  dlg.querySelector(".dt-corpo").scrollTop = 0;
+}
+
+$("#detalhe").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });  // clique fora fecha
+$("#detalhe").addEventListener("close", () => { $("#detalhe").innerHTML = ""; });
+$("#grid").addEventListener("click", e => {
+  const b = e.target.closest("[data-det]"); if (b) abrirDetalhe(filtrados[+b.dataset.det]);
+});
+
+/* ---------- Galeria de fotos ---------- */
+let gal = {l:null, i:0};
+function galMostrar(){
+  const {l, i} = gal, f = l.fotos[i];
+  $("#galImg").src = f.src;
+  $("#galInfo").textContent = `Lote ${l.lote} · foto ${i+1} de ${l.fotos.length}`;
+  $(".gal .ant").hidden = $(".gal .prox").hidden = l.fotos.length < 2;
+  new Image().src = l.fotos[(i+1) % l.fotos.length].src; // pré-carrega a próxima
+}
+function galPasso(d){ gal.i = (gal.i + d + gal.l.fotos.length) % gal.l.fotos.length; galMostrar(); }
+$("#grid").addEventListener("click", e => {
+  const b = e.target.closest("button.foto"); if (!b) return;
+  gal = {l: filtrados[+b.dataset.idx], i: 0}; galMostrar(); $("#galeria").showModal();
+});
+$(".gal .ant").onclick = () => galPasso(-1);
+$(".gal .prox").onclick = () => galPasso(1);
+$(".gal .fechar").onclick = () => $("#galeria").close();
+$("#galeria").addEventListener("click", e => { if (e.target.classList.contains("gal")) $("#galeria").close(); });
+$("#galeria").addEventListener("keydown", e => { if (e.key==="ArrowLeft") galPasso(-1); if (e.key==="ArrowRight") galPasso(1); });
+$("#galeria").addEventListener("close", () => $("#galImg").removeAttribute("src"));
+
+/* ---------- Mapa do ICMS ---------- */
+let ativo = null, lance = 1000;
+const cor = (p, min, max) => `color-mix(in oklch, var(--esc1) ${Math.round((max>min?(p-min)/(max-min):0)*100)}%, var(--esc0))`;
+
+function montarMapa(){
+  const svg = $("#mapa");
+  svg.setAttribute("viewBox", geo.viewBox);
+  const vals = Object.values(icms).map(a => a.pct), min = Math.min(...vals), max = Math.max(...vals);
+  $("#lmin").textContent = pctFmt(min); $("#lmax").textContent = pctFmt(max);
+  const gP = document.createElementNS(NS,"g"), gT = document.createElementNS(NS,"g");
+  svg.append(gP, gT);
+  for (const [uf, d] of Object.entries(geo.ufs)){
+    const a = icms[uf], p = document.createElementNS(NS,"path");
+    p.setAttribute("d", d.path); p.dataset.uf = uf;
+    p.setAttribute("tabindex","0"); p.setAttribute("role","button");
+    p.setAttribute("aria-label", `${d.nome}: ICMS ${a ? pctFmt(a.pct) : "não informado"}. Clique para filtrar.`);
+    p.style.setProperty("--c", a ? cor(a.pct, min, max) : "var(--bg-2)");
+    gP.append(p);
+  }
+  requestAnimationFrame(() => {                 // getBBox precisa do SVG visível
+    for (const p of gP.children){
+      const b = p.getBBox();
+      if (b.width * b.height < 900) continue;   // sem sigla nos estados muito pequenos
+      const t = document.createElementNS(NS,"text");
+      t.setAttribute("x", b.x + b.width/2); t.setAttribute("y", b.y + b.height/2);
+      t.dataset.uf = p.dataset.uf; t.textContent = p.dataset.uf;
+      gT.append(t);
+    }
+  });
+}
+
+function ativar(uf){
+  if (ativo === uf) return;
+  ativo = uf;
+  const svg = $("#mapa");
+  svg.classList.toggle("tem-ativo", !!uf);
+  svg.querySelectorAll(".ativo").forEach(el => el.classList.remove("ativo"));
+  if (uf){
+    const p = svg.querySelector(`path[data-uf="${uf}"]`);
+    p.classList.add("ativo"); p.parentNode.append(p);   // traz para frente
+    svg.querySelector(`text[data-uf="${uf}"]`)?.classList.add("ativo");
+  }
+  painel(uf || $("#uf").value);
+}
+
+function mapaFiltro(uf){
+  if (!geo) return;
+  $("#mapa").querySelectorAll(".filtro").forEach(el => el.classList.remove("filtro"));
+  if (uf) $("#mapa").querySelector(`path[data-uf="${uf}"]`)?.classList.add("filtro");
+  if (!ativo) painel(uf);
+}
+
+function painel(uf){
+  const el = $("#painel");
+  if (!uf || !icms[uf] || !geo.ufs[uf]){
+    el.innerHTML = '<div class="vazio-painel">Passe o mouse sobre um estado para ver a alíquota de ICMS e simular o imposto. Clique para ver só os lotes daquele estado.</div>';
+    return;
+  }
+  const d = geo.ufs[uf], a = icms[uf], n = lotesPorUF[uf] || 0, filtrando = $("#uf").value === uf;
+  el.innerHTML = `
+    <h2>${esc(d.nome)}</h2><div class="reg">${esc(d.regiao)} · ${uf} · ${n.toLocaleString("pt-BR")} lotes abertos no total</div>
+    <div class="pct">${pctFmt(a.pct)}</div>
+    <span class="selo ${a.conferido?"ok":"est"}">${a.conferido?"✓ Conferido":"Estimativa a conferir"}</span>
+    ${a.fonte?`<div class="obs">Fonte: ${esc(a.fonte)}</div>`:""}${a.obs?`<div class="obs">${esc(a.obs)}</div>`:""}
+    <div class="calc">
+      <label for="lance">Simular valor do lance</label>
+      <input id="lance" class="campo" type="number" min="0" step="50" value="${lance}">
+      <dl class="linhas">
+        <dt>ICMS (${pctFmt(a.pct)})</dt><dd id="vImp">${brl(lance*a.pct/100)}</dd>
+        <dt class="tot">Total</dt><dd class="tot" id="vTot">${brl(lance*(1+a.pct/100))}</dd>
+      </dl>
+    </div>
+    <button class="btn ${filtrando?"":"primario"}" id="btnFiltro" style="width:100%;margin-top:14px" data-uf="${uf}">
+      ${filtrando ? "Mostrar todos os estados" : n ? `Ver ${n.toLocaleString("pt-BR")} lotes em ${uf}` : `Nenhum lote aberto em ${uf}`}</button>`;
+  $("#lance").addEventListener("input", e => {
+    lance = Math.max(0, parseFloat(e.target.value) || 0);
+    $("#vImp").textContent = brl(lance*a.pct/100); $("#vTot").textContent = brl(lance*(1+a.pct/100));
+  });
+  $("#btnFiltro").disabled = !n && !filtrando;
+  $("#btnFiltro").onclick = () => filtrarUF(filtrando ? "" : uf);
+}
+
+function filtrarUF(uf){
+  if (uf && ![...$("#uf").options].some(o => o.value === uf)) return;
+  $("#uf").value = uf; ativo = null; aplicar();
+  $(".barra-res").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function tooltip(e, uf){
+  const tip = $("#tip");
+  if (!uf || !icms[uf]){ tip.classList.remove("on"); return; }
+  const a = icms[uf];
+  tip.innerHTML = `${esc(geo.ufs[uf].nome)} <b>${pctFmt(a.pct)}</b><small>${a.conferido?"conferido":"estimativa *"} · ${(lotesPorUF[uf]||0).toLocaleString("pt-BR")} lotes abertos</small>`;
+  tip.style.left = Math.min(e.clientX + 16, innerWidth - tip.offsetWidth - 8) + "px";
+  tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 14) + "px";
+  tip.classList.add("on");
+}
+
+function eventosMapa(){
+  const svg = $("#mapa");
+  svg.addEventListener("pointermove", e => { if (e.pointerType === "mouse"){ const uf = e.target.dataset?.uf; ativar(uf || null); tooltip(e, uf); } });
+  svg.addEventListener("pointerleave", () => { ativar(null); tooltip(null); });
+  svg.addEventListener("click", e => {
+    const uf = e.target.dataset?.uf; if (!uf) return;
+    if (e.pointerType === "touch" && ativo !== uf){ ativar(uf); return; }   // 1º toque mostra, 2º filtra
+    filtrarUF($("#uf").value === uf ? "" : uf);
+  });
+  svg.addEventListener("focusin", e => { const uf = e.target.dataset?.uf; if (uf) ativar(uf); });
+  svg.addEventListener("focusout", () => ativar(null));
+  svg.addEventListener("keydown", e => { const uf = e.target.dataset?.uf; if (uf && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); filtrarUF($("#uf").value === uf ? "" : uf); } });
+  const det = $("#icms");
+  const largo = matchMedia("(min-width:1100px)");   // tela larga: mapa fixo à direita, sempre aberto
+  try { if (!largo.matches && localStorage.getItem("mapaFechado") === "1") det.open = false; } catch {}
+  largo.addEventListener("change", () => { if (largo.matches) det.open = true; });
+  det.addEventListener("toggle", () => {
+    if (largo.matches){ det.open = true; return; }
+    try { localStorage.setItem("mapaFechado", det.open ? "0" : "1"); } catch {}
+  });
+}
+
+/* ---------- Início ---------- */
+Promise.all([
+  fetch("dados.json").then(r=>r.json()),
+  fetch("icms.json",{cache:"no-store"}).then(r=>r.json()),
+  fetch("brasil-ufs.json").then(r=>r.json()).catch(()=>null),
+]).then(([d, i, g]) => {
+  icms = i.aliquotas; geo = g;
+  d.editais.forEach(e => editais[e.edle] = e);
+  lotes = d.lotes.map(l => ({...l, fotos: l.fotos || [], _busca: norm([l.tipo, l.recinto, l.itens.map(x=>x.d).join(" "), (editais[l.edle]||{}).cidade].join(" "))}));
+  for (const l of lotes) if (l.uf) lotesPorUF[l.uf] = (lotesPorUF[l.uf]||0) + 1;
+  $("#gerado").textContent = `${lotes.length.toLocaleString("pt-BR")} lotes em ${d.editais.length} editais abertos · atualizado em ${d.geradoEm}`;
+  for (const u of [...new Set(lotes.map(l=>l.uf).filter(Boolean))].sort()) $("#uf").add(new Option(u,u));
+  for (const t of [...new Set(lotes.map(l=>l.tipo).filter(Boolean))].sort()) $("#tipo").add(new Option(t,t));
+  if (geo){ montarMapa(); eventosMapa(); } else $("#icms").hidden = true;
+  let f = PADRAO;
+  try { f = {...PADRAO, ...JSON.parse(localStorage.getItem("filtros")||"{}")}; } catch {}
+  const ufUrl = new URLSearchParams(location.search).get("uf");
+  if (ufUrl) f = {...f, uf: ufUrl.toUpperCase()};
+  escrever(f);
+  aplicar();
+}).catch(err => { $("#gerado").textContent = "Erro ao carregar dados.json — rode coletar.py primeiro. (" + err + ")"; $("#grid").innerHTML = ""; });
+
+let t; $("#q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(aplicar, 150); });
+for (const id of ["#uf","#tipo","#pf","#comFoto","#max","#ord"]) $(id).addEventListener("change", aplicar);
+$("#mais").addEventListener("click", () => renderMais());
+$("#limpar").addEventListener("click", () => { escrever(PADRAO); aplicar(); });
+</script>
+</body>
+</html>

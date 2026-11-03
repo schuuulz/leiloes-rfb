@@ -1,0 +1,48 @@
+name: Atualizar e publicar
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # a cada 6 horas (UTC)
+  workflow_dispatch:         # permite rodar manualmente
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Guarda os detalhes de lotes já baixados entre execuções
+      - uses: actions/cache@v4
+        with:
+          path: cache
+          key: lotes-${{ github.run_id }}
+          restore-keys: lotes-
+
+      - name: Coletar lotes
+        run: python coletar.py
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

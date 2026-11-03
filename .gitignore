@@ -1,0 +1,5 @@
+# Gerados pela coleta (o workflow recria a cada execução)
+cache/
+coleta.log
+site/dados.json
+__pycache__/

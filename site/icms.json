@@ -1,0 +1,32 @@
+{
+  "_nota": "Alíquota interna padrão por UF. 'conferido' = confirmado em fonte oficial (edital/SEFAZ). Demais valores são estimativas a conferir antes de publicar. Produtos específicos podem ter alíquota diferente.",
+  "aliquotas": {
+    "AC": {"pct": 19,   "conferido": false},
+    "AL": {"pct": 20.5, "conferido": false},
+    "AM": {"pct": 20,   "conferido": false},
+    "AP": {"pct": 18,   "conferido": false},
+    "BA": {"pct": 20.5, "conferido": false},
+    "CE": {"pct": 20,   "conferido": false},
+    "DF": {"pct": 20,   "conferido": false},
+    "ES": {"pct": 17,   "conferido": false},
+    "GO": {"pct": 19,   "conferido": false},
+    "MA": {"pct": 23,   "conferido": false},
+    "MG": {"pct": 18,   "conferido": false},
+    "MS": {"pct": 17,   "conferido": false},
+    "MT": {"pct": 17,   "conferido": false},
+    "PA": {"pct": 19,   "conferido": false},
+    "PB": {"pct": 20,   "conferido": false},
+    "PE": {"pct": 20.5, "conferido": false},
+    "PI": {"pct": 22.5, "conferido": false},
+    "PR": {"pct": 19.5, "conferido": false},
+    "RJ": {"pct": 22,   "conferido": false, "obs": "20% + 2% FECP"},
+    "RN": {"pct": 20,   "conferido": false},
+    "RO": {"pct": 19.5, "conferido": false},
+    "RR": {"pct": 20,   "conferido": false},
+    "RS": {"pct": 17,   "conferido": false},
+    "SC": {"pct": 17,   "conferido": false},
+    "SE": {"pct": 20,   "conferido": false},
+    "SP": {"pct": 18,   "conferido": true, "fonte": "Edital 0800100/000015/2026; DN SRE 01/2024", "obs": "DARE código 063-2 / serviço 06305, visto no SIPET"},
+    "TO": {"pct": 20,   "conferido": false}
+  }
+}
