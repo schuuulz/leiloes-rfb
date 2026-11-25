@@ -18,6 +18,7 @@ RAIZ = Path(__file__).parent
 CACHE = RAIZ / "cache" / "lotes"
 SAIDA = RAIZ / "site" / "dados.json"
 UA = "leilao-receita-prototipo/0.1 (consulta moderada a dados publicos)"
+VALIDADE_CACHE = 3 * 24 * 3600  # segundos até rebaixar o detalhe de um lote
 
 # Cidade sede da unidade -> UF (usado quando o recinto não traz "/UF")
 CIDADE_UF = {
@@ -81,10 +82,20 @@ def uf_do_recinto(recinto):
     return next((CIDADE_UF[c] for c in sorted(CIDADE_UF, key=len, reverse=True) if c in r), None)
 
 
-def detalhe_lote(edle, nr, intervalo):
+def detalhe_lote(edle, nr, intervalo, espera_fotos=False):
+    """Detalhe do lote, com cache em disco.
+
+    O cache é refeito quando passa de VALIDADE_CACHE ou quando a listagem do
+    edital indica fotos (espera_fotos) e o detalhe guardado não tem nenhuma:
+    a Receita costuma publicar as fotos depois que o edital já está aberto.
+    """
     arq = CACHE / f"{edle.replace('/', '_')}_{nr}.json"
     if arq.exists():
-        return json.loads(arq.read_text(encoding="utf-8"))
+        d = json.loads(arq.read_text(encoding="utf-8"))
+        velho = time.time() - arq.stat().st_mtime > VALIDADE_CACHE
+        sem_fotos = espera_fotos and not d.get("imagens")
+        if not (velho or sem_fotos):
+            return d
     d = get(f"lote/{edle}/{nr}")
     d.pop("lotesQueUsuarioTemPermissao", None)
     arq.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
@@ -123,7 +134,8 @@ def main():
             for l in ed.get("listaLotes", []):
                 nr = l["nrAtribuido"]
                 try:
-                    d = detalhe_lote(edle, nr, args.intervalo)
+                    d = detalhe_lote(edle, nr, args.intervalo,
+                                     espera_fotos=bool(l.get("possuiImagens")))
                 except Exception as ex:
                     print(f"  lote {nr}: falhou ({ex})")
                     d = {}
